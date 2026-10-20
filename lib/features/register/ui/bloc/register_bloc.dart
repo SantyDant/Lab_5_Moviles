@@ -1,66 +1,90 @@
-// Eventos que recibo
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-abstract class RegisterEvent {}
+import 'package:moviles_auth/features/auth/domain/entities/profile.dart';
+import 'package:moviles_auth/features/auth/domain/errors/auth_failure.dart';
+import 'package:moviles_auth/features/auth/domain/usecases/sign_up_usecase.dart';
 
-class OnRegisterSubmittedEvent extends RegisterEvent {
-  final String fullName;
+// ---------- Eventos ----------
+
+sealed class RegisterEvent {}
+
+/// El usuario tocó "Registrarme".
+class RegisterSubmitted extends RegisterEvent {
   final String username;
+  final String fullName;
   final String email;
   final String password;
+  final String confirmPassword;
 
-  OnRegisterSubmittedEvent({
-    required this.fullName,
+  RegisterSubmitted({
     required this.username,
+    required this.fullName,
     required this.email,
     required this.password,
+    required this.confirmPassword,
   });
 }
 
-// Estados que emito
-abstract class RegisterState {}
+// ---------- Estados ----------
 
-class RegisterIdleState extends RegisterState {}
+sealed class RegisterState {}
 
-class RegisterLoadingState extends RegisterState {}
+class RegisterIdle extends RegisterState {}
 
-class RegisterErrorState extends RegisterState {
-  final String errorMessage;
-  RegisterErrorState({required this.errorMessage});
+class RegisterLoading extends RegisterState {}
+
+class RegisterSuccess extends RegisterState {
+  final Profile profile;
+  RegisterSuccess(this.profile);
 }
 
-class RegisterSuccessState extends RegisterState {}
+class RegisterFailure extends RegisterState {
+  final String message;
+  RegisterFailure(this.message);
+}
 
-// La clase Bloc
+// ---------- Bloc ----------
 
 class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
-  RegisterBloc() : super(RegisterIdleState()) {
-    on<OnRegisterSubmittedEvent>(register);
+  final SignUpUseCase _signUp;
+
+  RegisterBloc(this._signUp) : super(RegisterIdle()) {
+    on<RegisterSubmitted>(_onSubmitted);
   }
 
-  Future<void> register(
-    OnRegisterSubmittedEvent event,
+  Future<void> _onSubmitted(
+    RegisterSubmitted event,
     Emitter<RegisterState> emit,
   ) async {
-    emit(RegisterLoadingState());
-    //Registro, tengo que llamarlo desde un caso de uso
+    final username = event.username.trim();
+    final fullName = event.fullName.trim();
+    final email = event.email.trim();
+
+    if (username.isEmpty ||
+        fullName.isEmpty ||
+        email.isEmpty ||
+        event.password.isEmpty) {
+      emit(RegisterFailure('Completa todos los campos'));
+      return;
+    }
+    if (event.password != event.confirmPassword) {
+      emit(RegisterFailure('Las contraseñas no coinciden'));
+      return;
+    }
+
+    emit(RegisterLoading());
     try {
-      //1. Auth
-      AuthResponse response = await Supabase.instance.client.auth.signUp(
-        email: event.email,
+      final profile = await _signUp(
+        username: username,
+        fullName: fullName,
+        email: email,
         password: event.password,
       );
-      //2. DB
-      await Supabase.instance.client.from('profiles').insert({
-        'id': response.user?.id,
-        'username': event.username,
-        'full_name': event.fullName,
-        'email': event.email,
-      });
-      emit(RegisterSuccessState());
-    } on Exception catch (e) {
-      emit(RegisterErrorState(errorMessage: e.toString()));
+      emit(RegisterSuccess(profile));
+    } on AuthFailure catch (e) {
+      emit(RegisterFailure(e.message));
+    } catch (_) {
+      emit(RegisterFailure('Ocurrió un error inesperado. Intenta de nuevo'));
     }
   }
 }
