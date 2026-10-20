@@ -37,7 +37,13 @@ class SignUpUseCase {
       fullName: fullName,
       email: user.email,
     );
-    await _profileRepository.createProfile(profile);
+    try {
+      await _profileRepository.createProfile(profile);
+    } on AuthFailure {
+      // La cuenta quedó creada sin perfil: no dejar la sesión abierta.
+      await _authRepository.signOut();
+      rethrow;
+    }
     return profile;
   }
 }
