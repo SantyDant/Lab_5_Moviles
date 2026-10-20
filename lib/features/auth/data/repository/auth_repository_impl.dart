@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 
 import 'package:moviles_auth/features/auth/data/source/supabase_auth_data_source.dart';
 import 'package:moviles_auth/features/auth/domain/entities/auth_user.dart';
