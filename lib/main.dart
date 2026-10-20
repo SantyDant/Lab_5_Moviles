@@ -10,9 +10,11 @@ import 'package:moviles_auth/features/auth/data/source/supabase_profile_data_sou
 import 'package:moviles_auth/features/auth/domain/entities/profile.dart';
 import 'package:moviles_auth/features/auth/domain/repository/auth_repository.dart';
 import 'package:moviles_auth/features/auth/domain/repository/profile_repository.dart';
+import 'package:moviles_auth/features/auth/domain/usecases/sign_in_usecase.dart';
 import 'package:moviles_auth/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:moviles_auth/features/auth/domain/usecases/sign_up_usecase.dart';
 import 'package:moviles_auth/features/home/ui/screens/home_screen.dart';
+import 'package:moviles_auth/features/login/ui/bloc/login_bloc.dart';
 import 'package:moviles_auth/features/login/ui/screens/login_screen.dart';
 import 'package:moviles_auth/features/register/ui/bloc/register_bloc.dart';
 import 'package:moviles_auth/features/register/ui/screens/register_screen.dart';
@@ -59,7 +61,7 @@ class App extends StatelessWidget {
       theme: buildTheme(),
       initialRoute: '/login',
       routes: {
-        '/login': (_) => const LoginScreen(),
+        '/login': (_) => _loginRoute(),
         '/register': (_) => BlocProvider(
           create: (_) =>
               RegisterBloc(SignUpUseCase(authRepository, profileRepository)),
@@ -69,7 +71,7 @@ class App extends StatelessWidget {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is! Profile) {
             // Sin perfil no hay sesión que mostrar.
-            return const LoginScreen();
+            return _loginRoute();
           }
           return HomeScreen(
             profile: args,
@@ -77,6 +79,14 @@ class App extends StatelessWidget {
           );
         },
       },
+    );
+  }
+
+  Widget _loginRoute() {
+    return BlocProvider(
+      create: (_) =>
+          LoginBloc(SignInUseCase(authRepository, profileRepository)),
+      child: const LoginScreen(),
     );
   }
 }

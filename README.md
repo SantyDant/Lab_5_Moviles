@@ -1,6 +1,8 @@
-# moviles_auth
+# Laboratorio 5 — Registro e inicio de sesión con Supabase
 
-Proyecto base para el **Laboratorio 5: Flujo de login**. Trae las tres pantallas ya dibujadas, en las mismas carpetas y con los mismos nombres del mapa del laboratorio, y la navegación entre ellas. No tiene `Supabase` ni `Bloc` conectados: eso es lo que construyes en el laboratorio.
+**Autor:** Santiago Mosquera — Aplicaciones Móviles, Universidad Icesi
+
+App Flutter con registro (Parte 1) e inicio de sesión (Parte 2) sobre Supabase, organizada con Clean Architecture y Bloc. Parte del proyecto base 262App3 del curso.
 
 ## Cómo correrlo
 
@@ -9,34 +11,39 @@ flutter pub get
 flutter run
 ```
 
-`flutter_bloc` y `supabase_flutter` ya están en el `pubspec.yaml`.
+Por defecto usa el proyecto de Supabase del curso. Para usar otro:
 
-## Qué trae
+```bash
+flutter run --dart-define=SUPABASE_URL=https://xxxx.supabase.co --dart-define=SUPABASE_KEY=sb_publishable_xxxx
+```
+
+En Supabase hay que tener la tabla `profiles` (ver `supabase/migrations`) y desactivar **Confirm email** en *Authentication*, porque el perfil se inserta con la sesión que devuelve el registro.
+
+## Arquitectura
 
 ```
 lib/
-├── main.dart                 tema y rutas nombradas
-├── theme/app_theme.dart      AppColors y buildTheme()
-├── components/
-│   ├── primary_button.dart   botón con estado de carga
-│   ├── error_message.dart    mensaje de error bajo el formulario
-│   └── profile_field.dart    fila de dato del perfil
-└── features/
-    ├── login/ui/screens/login_screen.dart
-    ├── register/ui/screens/register_screen.dart
-    └── home/ui/screens/home_screen.dart
+├── core/supabase_config.dart           URL y llave de Supabase
+├── features/auth/
+│   ├── domain/                          sin dependencias de Supabase
+│   │   ├── entities/      Profile, AuthUser
+│   │   ├── errors/        AuthFailure (mensaje para el usuario)
+│   │   ├── repository/    AuthRepository, ProfileRepository (contratos)
+│   │   └── usecases/      SignUpUseCase, SignInUseCase, SignOutUseCase
+│   └── data/
+│       ├── source/        SupabaseAuthDataSource, SupabaseProfileDataSource
+│       └── repository/    implementaciones que traducen errores a AuthFailure
+├── features/register/ui/  RegisterBloc + RegisterScreen   (Parte 1)
+├── features/login/ui/     LoginBloc + LoginScreen         (Parte 2)
+└── features/home/ui/      HomeScreen con el perfil real y cierre de sesión
 ```
 
-| Ruta | Pantalla | Qué hace hoy |
-| --- | --- | --- |
-| `/login` | `LoginScreen` | Valida que los campos no estén vacíos y navega a `/home` |
-| `/register` | `RegisterScreen` | Valida los campos, compara las dos contraseñas y navega a `/home` |
-| `/home` | `HomeScreen` | Muestra datos de ejemplo y vuelve a `/login` al cerrar sesión |
+**Flujo de registro:** `RegisterScreen` → evento `RegisterSubmitted` → `RegisterBloc` valida campos y contraseñas → `SignUpUseCase` crea la cuenta en Supabase Auth e inserta la fila en `profiles` → estado `RegisterSuccess(profile)` → `BlocListener` navega a `/home` con el perfil.
 
-## Qué te toca conectar
+**Flujo de login:** `LoginScreen` → `LoginSubmitted` → `LoginBloc` → `SignInUseCase` inicia sesión y lee el perfil → `LoginSuccess(profile)` → `/home`.
 
-- **Las capas de adentro.** Crea `features/auth/domain` y `features/auth/data` como indica el mapa del laboratorio.
-- **Los `Bloc`.** Crea `login/ui/bloc/` y `register/ui/bloc/` junto a la carpeta `screens/` de cada feature.
-- **`main.dart`.** Inicializa `Supabase` y envuelve cada ruta en su `BlocProvider`.
-- **`LoginScreen` y `RegisterScreen`.** Hoy guardan `_isLoading` y `_errorMessage` con `setState`, y `_submit()` navega directo. Reemplaza eso por tu `Bloc`: `_submit()` lanza el evento, `BlocBuilder` decide el `isLoading` del `PrimaryButton` y el `ErrorMessage`, y `BlocListener` navega cuando el estado es `success`.
-- **`HomeScreen`.** Hoy recibe `username`, `fullName` y `email` con valores de ejemplo. Pásale los datos reales del usuario que inició sesión, y haz que `Cerrar sesión` llame a `signOut` antes de navegar.
+`main.dart` crea los repositorios y envuelve cada ruta en su `BlocProvider`. `App` recibe los repositorios por constructor, así los tests usan versiones en memoria (`test/navigation_test.dart`).
+
+```bash
+flutter test
+```
